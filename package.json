@@ -1,0 +1,47 @@
+{
+  "name": "monitoring",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "files": [
+    "dist",
+    "index.d.ts"
+  ],
+  "main": "./dist/counter.umd.cjs",
+  "module": "./dist/counter.js",
+  "types": "./index.d.ts",
+  "exports": {
+    "types": "./index.d.ts",
+    "import": "./dist/counter.js",
+    "require": "./dist/counter.umd.cjs"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "lint": "eslint . --fix",
+    "format": "prettier --write .",
+    "prepare": "husky",
+    "commit": "commit"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.0",
+    "@commitlint/config-conventional": "^19.8.0",
+    "@commitlint/prompt-cli": "^19.8.0",
+    "eslint": "^8.0.1",
+    "eslint-config-prettier": "^10.1.1",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-plugin-import": "^2.25.2",
+    "eslint-plugin-n": "^15.0.0 || ^16.0.0 ",
+    "eslint-plugin-prettier": "^5.2.3",
+    "eslint-plugin-promise": "^6.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.0",
+    "prettier": "^3.5.3",
+    "typescript": "~5.7.3",
+    "vite": "^6.1.1"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,cjs,mjs,vue}": "eslint --fix",
+    "*.{ts,tsx,js,jsx,cjs,mjs,vue,css,scss,less,styl,md,html}": "prettier --write"
+  }
+}
