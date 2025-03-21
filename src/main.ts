@@ -2,6 +2,20 @@ import './style.css'
 import typescriptLogo from './typescript.svg'
 import { setupCounter } from '../lib/main'
 
+// 捕获 JS 运行时错误
+window.addEventListener(
+  'error',
+  (event) => {
+    console.log('instanceof', event instanceof ErrorEvent)
+    console.log(event)
+  },
+  true
+)
+
+const script = document.createElement('script')
+script.src = 'https://libs.baidu.com/jquery/3.6.0/jquery.min.js'
+document.head.appendChild(script)
+
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div>
     <a href="https://vite.dev" target="_blank">
