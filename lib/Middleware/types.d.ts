@@ -4,8 +4,13 @@ interface Middleware<T> {
   process: Process<T> // 中间件处理函数
 }
 
+interface Context {
+  exceptionHandler?: (ctx: any) => void
+  [key: string]: any
+}
+
 type Process<T> = (context: T, next: Next) => Promise<void> | void
 
 type Next = () => Promise<void> | void
 
-export { type Middleware, type Next, type Process }
+export { type Middleware, type Next, type Process, type Context }
