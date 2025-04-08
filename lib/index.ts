@@ -1,11 +1,10 @@
-import MiddlewareManager from './Middleware'
 import { type Context } from './Middleware/types'
-import { exceptionCaptureMiddleware } from './ExceptionCapture'
+import { ExceptionCapture } from './ExceptionCapture'
+import { flushDataMiddleware } from './FlushData'
 
 function initCapture(ctx: Context = {}) {
-  const middlewareManager = new MiddlewareManager<Context>()
-  middlewareManager.use(exceptionCaptureMiddleware())
-  middlewareManager.execute(ctx)
+  const exceptionCapture = new ExceptionCapture(ctx)
+  exceptionCapture.use(flushDataMiddleware())
 }
 
 export default initCapture

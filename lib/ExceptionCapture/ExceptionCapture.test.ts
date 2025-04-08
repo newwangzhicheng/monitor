@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { exceptionCaptureMiddleware } from './index'
 import { type Context } from '@/Middleware/types'
-// import { ExceptionType } from './types'
 
 describe('exceptionCaptureMiddleware', () => {
   // 模拟window对象
@@ -43,7 +42,7 @@ describe('exceptionCaptureMiddleware', () => {
 
     expect(ctx.exceptions).toBeDefined()
     expect(Array.isArray(ctx.exceptions)).toBe(true)
-    expect(ctx.exceptions.length).toBe(0)
+    expect(ctx.exceptions?.length).toBe(0)
   })
 
   it('应该注册所有错误事件监听器', async () => {
@@ -82,10 +81,10 @@ describe('exceptionCaptureMiddleware', () => {
     errorHandler(errorEvent)
 
     // 验证错误是否被添加到exceptions数组
-    expect(ctx.exceptions.length).toBe(1)
-    expect(ctx.exceptions[0].error).toBe(errorEvent)
-    expect(ctx.exceptions[0].processed).toBe(false)
-    expect(ctx.exceptions[0].shouldReport).toBe(true)
+    expect(ctx.exceptions?.length).toBe(1)
+    expect(ctx.exceptions?.[0].error).toBe(errorEvent)
+    expect(ctx.exceptions?.[0].processed).toBe(false)
+    expect(ctx.exceptions?.[0].shouldReport).toBe(true)
   })
 
   it('应该正确捕获资源错误', async () => {
@@ -107,8 +106,8 @@ describe('exceptionCaptureMiddleware', () => {
     errorHandler(resourceEvent)
 
     // 验证错误是否被添加到exceptions数组
-    expect(ctx.exceptions.length).toBe(1)
-    expect(ctx.exceptions[0].error).toBe(resourceEvent)
+    expect(ctx.exceptions?.length).toBe(1)
+    expect(ctx.exceptions?.[0].error).toBe(resourceEvent)
   })
 
   it('应该正确捕获Promise错误', async () => {
@@ -134,8 +133,8 @@ describe('exceptionCaptureMiddleware', () => {
     promiseHandler(promiseEvent)
 
     // 验证错误是否被添加到exceptions数组
-    expect(ctx.exceptions.length).toBe(1)
-    expect(ctx.exceptions[0].error).toBe(promiseEvent)
+    expect(ctx.exceptions?.length).toBe(1)
+    expect(ctx.exceptions?.[0].error).toBe(promiseEvent)
   })
 
   it('应该正确捕获CORS错误', async () => {
@@ -159,8 +158,8 @@ describe('exceptionCaptureMiddleware', () => {
     errorHandler(corsEvent)
 
     // 验证错误是否被添加到exceptions数组
-    expect(ctx.exceptions.length).toBe(1)
-    expect(ctx.exceptions[0].error).toBe(corsEvent)
+    expect(ctx.exceptions?.length).toBe(1)
+    expect(ctx.exceptions?.[0].error).toBe(corsEvent)
   })
 
   it('应该正确调用next函数', async () => {

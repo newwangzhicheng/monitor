@@ -1,23 +1,21 @@
-import { type Exception, ExceptionType, type ResourceErrorTarget } from './types.d'
-import { type Middleware, type Context } from '@/Middleware/types'
+import {
+  type Exception,
+  ExceptionType,
+  type ResourceErrorTarget,
+  type MetadataObject
+} from './types.d'
+import { type Context, type Middleware } from '../Middleware/types'
+import MiddlewareManager from '../Middleware'
 
-// 捕获错误
-function exceptionCaptureMiddleware(): Middleware<Context> {
-  return {
-    name: 'captureException',
-    process: async (ctx, next) => {
-      new ExceptionCapture(ctx)
-      await next()
-    }
-  }
-}
 class ExceptionCapture {
   private exceptions: Exception[] = []
   private exceptionUids: Set<string> = new Set()
   private ctx: Context
+  private middlewareManager: MiddlewareManager<Context>
   constructor(ctx: Context) {
     this.ctx = ctx
     ctx.exceptions = this.exceptions
+    this.middlewareManager = new MiddlewareManager<Context>()
     // 初始化js错误
     this.initJsError()
     // 初始化资源错误
@@ -136,7 +134,7 @@ class ExceptionCapture {
     type
   }: {
     event: ErrorEvent | Event
-    metadata: object
+    metadata: MetadataObject
     type: ExceptionType
   }): Exception {
     return {
@@ -151,7 +149,7 @@ class ExceptionCapture {
 
   // 生成异常uid
   private generateExceptionUid(id: string) {
-    return window.btoa(encodeURIComponent(id))
+    return window.btoa(encodeURIComponent(id)) + Date.now()
   }
 
   // 检查异常uid是否存在, 如果存在，加入uid，返回true，否则返回false
@@ -170,46 +168,20 @@ class ExceptionCapture {
     type
   }: {
     event: ErrorEvent | Event
-    metadata: object
+    metadata: MetadataObject
     type: ExceptionType
   }) {
-    this.exceptions.push(this.initContext({ event, metadata, type }))
-    this.ctx.exceptionHandler?.(this.ctx)
+    // 添加异常到数组
+    const exception = this.initContext({ event, metadata, type })
+    this.exceptions.push(exception)
+
+    this.middlewareManager.execute(this.ctx)
   }
 
-  //   // 解析js异常栈行，获取文件名，函数名，行，列信息
-  //   private parseJsExceptionStackLine(line: string) {
-  //     if (!line.trim().startsWith('at')) {
-  //       return null
-  //     }
-  //     const lines = line.split('\n')
-  //     const filename = lines[0].split(' ')[0]
-  //     const functionName = lines[0].split(' ')[1]
-  //     const lineno = lines[0].split(' ')[2]
-  //     const columnno = lines[0].split(' ')[3]
-  //     return {
-  //       filename,
-  //       functionName,
-  //       lineno,
-  //       columnno
-  //     }
-  //   }
-
-  //   // 解析js异常栈，获取文件名，函数名，行，列信息,最长10行
-  //   private parseJsExceptionStack(stack: string) {
-  //     const lines = stack.split('\n')
-  //     const result = []
-  //     for (const line of lines) {
-  //       const parsedLine = this.parseJsExceptionStackLine(line)
-  //       if (parsedLine) {
-  //         result.push(parsedLine)
-  //       }
-  //       if (result.length >= 10) {
-  //         break
-  //       }
-  //     }
-  //     return result
-  //   }
+  // 使用中间件
+  public use(middleware: Middleware<Context>) {
+    this.middlewareManager.use(middleware)
+  }
 }
 
-export { exceptionCaptureMiddleware }
+export { ExceptionCapture }

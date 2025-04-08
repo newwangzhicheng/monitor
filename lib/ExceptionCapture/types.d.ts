@@ -11,9 +11,14 @@ interface Exception {
   readonly error: any // 原始的错误
   readonly timestamp: number // 错误发生时间, 时间戳
   type: ExceptionType // 错误类型
-  metadata: object // 附加元数据，如环境等
+  metadata: MetadataObject // 附加元数据，如环境等
   processed: boolean // 是否已处理
   shouldReport: boolean // 是否上报
+}
+
+interface MetadataObject {
+  uid: string // 错误id
+  [key: string]: any
 }
 
 // // 异常错误结构体
@@ -38,4 +43,4 @@ interface ResourceErrorTarget extends EventTarget {
   outerHTML?: string
 }
 
-export { ExceptionType, type Exception, type ResourceErrorTarget }
+export { ExceptionType, type Exception, type ResourceErrorTarget, type MetadataObject }
