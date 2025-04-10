@@ -254,7 +254,18 @@ class ExceptionCapture {
   private injectFetch() {
     const originalFetch = window.fetch
     const instance = this
+
     window.fetch = async function (input: globalThis.RequestInfo | URL, init?: RequestInit) {
+      // 检查是否是上报请求，如果是则直接调用原始fetch
+      if (init?.headers && typeof init.headers === 'object') {
+        const headers = init.headers as Record<string, string>
+        // 检查是否包含监控上报的特殊标记头
+        if (headers['x-monitor-report'] === 'true') {
+          // 是上报请求，直接调用原始fetch
+          return originalFetch.apply(this, [input, init])
+        }
+      }
+
       let url = ''
       if (input instanceof Request) {
         url = input.url
@@ -369,13 +380,14 @@ class ExceptionCapture {
     // 添加异常到数组
     const exception = this.initContext({ event, metadata, type })
     this.exceptions.push(exception)
-
+    this.ctx.currentException = exception
     this.middlewareManager.execute(this.ctx)
   }
 
   // 使用中间件
   public use(middleware: Middleware<Context>) {
     this.middlewareManager.use(middleware)
+    return this
   }
 }
 

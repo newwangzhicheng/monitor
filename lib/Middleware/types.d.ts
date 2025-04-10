@@ -1,5 +1,5 @@
 import { type Exception } from '@/ExceptionCapture/types'
-
+import { type FlushedData } from '@/FlushData/types'
 interface Middleware<T> {
   name: string // 中间件名称
   priority?: number // 中间件优先级，数字越大，优先级越高
@@ -7,8 +7,11 @@ interface Middleware<T> {
 }
 
 interface Context {
-  exceptionHandler?: (ctx: any) => void
   exceptions?: Exception[]
+  currentException?: Exception
+  flushedData?: FlushedData[]
+  currentFlushed?: FlushedException
+  report?: RequestParams
   [key: string]: any
 }
 

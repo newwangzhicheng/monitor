@@ -10,7 +10,10 @@ import {
   type FlushedJsException,
   type FlushedRsException,
   type FlushedUjException,
-  type FlushedHpException
+  type FlushedHpException,
+  type PageInfo,
+  type FlushedData,
+  FlushedException
 } from './types.d'
 
 function flushDataMiddleware(): Middleware<Context> {
@@ -26,30 +29,42 @@ function flushDataMiddleware(): Middleware<Context> {
 
 class FlushData {
   private readonly ctx: Context
+  private readonly flushedData: FlushedData[]
   constructor(ctx: Context) {
     this.ctx = ctx
+    this.flushedData = []
+    this.ctx.flushedData = this.flushedData
   }
 
   // 刷新异常数据
   public flushException() {
-    if (!this.ctx.exceptions) {
-      return []
+    if (!this.ctx.currentException) {
+      return
     }
-    const flushedData = this.ctx.exceptions.map((exception) => {
-      switch (exception.type) {
-        case ExceptionType.JS:
-          return this.flushJsException(exception)
-        case ExceptionType.RS:
-          return this.flushRsException(exception)
-        case ExceptionType.UJ:
-          return this.flushUjException(exception)
-        case ExceptionType.HP:
-          return this.flushHpException(exception)
-        default:
-          return null
-      }
-    })
-    this.ctx.flushedData = flushedData
+    const exception = this.ctx.currentException
+    let flushedException: FlushedException | null = null
+    switch (exception.type) {
+      case ExceptionType.JS:
+        flushedException = this.flushJsException(exception)
+        break
+      case ExceptionType.RS:
+        flushedException = this.flushRsException(exception)
+        break
+      case ExceptionType.UJ:
+        flushedException = this.flushUjException(exception)
+        break
+      case ExceptionType.HP:
+        flushedException = this.flushHpException(exception)
+        break
+      default:
+        break
+    }
+    const pageInfo = this.getPageInfo()
+    this.ctx.currentFlushed = {
+      pageInfo: pageInfo,
+      flushedExceptions: flushedException
+    }
+    this.flushedData.push(this.ctx.currentFlushed)
   }
 
   // js错误
@@ -175,6 +190,14 @@ class FlushData {
       }
     }
     return result
+  }
+
+  // 获取页面信息
+  private getPageInfo(): PageInfo {
+    return {
+      href: window.location.href,
+      userAgent: navigator.userAgent
+    }
   }
 }
 

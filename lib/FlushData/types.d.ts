@@ -1,3 +1,13 @@
+interface FlushedData {
+  pageInfo: PageInfo
+  flushedExceptions: FlushedException
+}
+
+interface PageInfo {
+  href: string
+  userAgent: string
+}
+
 type FlushedException =
   | FlushedJsException
   | FlushedRsException
@@ -43,10 +53,12 @@ interface FlushedUjExceptionStack {
   filename: string
 }
 export {
+  type FlushedData,
   type FlushedException,
   type FlushedJsException,
   type FlushedJsExceptionStack,
   type FlushedRsException,
   type FlushedUjException,
-  type FlushedHpException
+  type FlushedHpException,
+  type PageInfo
 }

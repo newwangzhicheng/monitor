@@ -9,7 +9,14 @@ import initCapture from '../lib'
 //   console.log('list', list.getEntries())
 // })
 // observer.observe({ entryTypes: ['paint'] })
-initCapture({})
+initCapture({
+  report: {
+    url: 'https://monitor.free.beeceptor.com/report',
+    headers: {
+      cookie: 'test=123'
+    }
+  }
+})
 // JS
 // function test() {
 //   new Array(-1)
