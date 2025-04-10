@@ -10,7 +10,7 @@ interface Context {
   exceptions?: Exception[]
   currentException?: Exception
   flushedData?: FlushedData[]
-  currentFlushed?: FlushedException
+  currentFlushed?: FlushedData
   report?: RequestParams
   [key: string]: any
 }

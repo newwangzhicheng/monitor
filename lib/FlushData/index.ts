@@ -29,7 +29,7 @@ function flushDataMiddleware(): Middleware<Context> {
 
 class FlushData {
   private readonly ctx: Context
-  private readonly flushedData: FlushedData[]
+  private flushedData: FlushedData[]
   constructor(ctx: Context) {
     this.ctx = ctx
     this.flushedData = []
@@ -62,15 +62,26 @@ class FlushData {
     const pageInfo = this.getPageInfo()
     this.ctx.currentFlushed = {
       pageInfo: pageInfo,
-      flushedExceptions: flushedException
+      flushedException: flushedException as FlushedException
     }
     this.flushedData.push(this.ctx.currentFlushed)
+    this.limitDataSize(100)
+  }
+
+  private limitDataSize(size: number) {
+    if (this.flushedData.length > size) {
+      this.flushedData = this.flushedData.slice(-size)
+    }
+    if (this.ctx.exceptions) {
+      this.ctx.exceptions = this.ctx.exceptions.slice(-size)
+    }
   }
 
   // js错误
   private flushJsException(exception: Exception): FlushedJsException {
     const error = exception.error as ErrorEvent
     return {
+      type: ExceptionType.JS,
       stacks: this.parseExceptionStack(error.error.stack)
     }
   }
@@ -80,6 +91,7 @@ class FlushData {
     const error = exception.error as ErrorEvent
     const target = error.target as ResourceErrorTarget
     return {
+      type: ExceptionType.RS,
       src: target.src ?? '',
       tagName: target.tagName ?? '',
       outerHTML: target.outerHTML ?? ''
@@ -91,6 +103,7 @@ class FlushData {
     const error = exception.error as PromiseRejectionEvent
     const reason = error.reason.message
     return {
+      type: ExceptionType.UJ,
       reason,
       stacks: this.parseExceptionStack(error.reason.stack)
     }
@@ -101,6 +114,7 @@ class FlushData {
     const { headers, ...rest } = exception.error as RequestInfo
     const error = (exception.error as RequestInfo).error
     const flushedHpException = {
+      type: ExceptionType.HP,
       ...rest,
       headers: this.desensitizeHeaders(this.switchHeaders(headers)),
       reason: error?.message ?? ''

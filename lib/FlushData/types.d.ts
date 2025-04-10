@@ -1,6 +1,8 @@
+import { type ExceptionType } from '@/ExceptionCapture/types'
+
 interface FlushedData {
   pageInfo: PageInfo
-  flushedExceptions: FlushedException
+  flushedException: FlushedException
 }
 
 interface PageInfo {
@@ -14,22 +16,25 @@ type FlushedException =
   | FlushedUjException
   | FlushedHpException
 
-interface FlushedJsException {
+interface FlushedBaseException {
+  type: ExceptionType
+}
+interface FlushedJsException extends FlushedBaseException {
   stacks: FlushedJsExceptionStack[]
 }
 
-interface FlushedRsException {
+interface FlushedRsException extends FlushedBaseException {
   src: string
   tagName: string
   outerHTML: string
 }
 
-interface FlushedUjException {
+interface FlushedUjException extends FlushedBaseException {
   reason: string
   stacks: FlushedUjExceptionStack[]
 }
 
-interface FlushedHpException {
+interface FlushedHpException extends FlushedBaseException {
   url: string
   method: string
   headers: Record<string, string>

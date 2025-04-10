@@ -1,6 +1,7 @@
 import { type Context, type Middleware } from '../Middleware/types'
-import { type FlushedData } from '../FlushData/types'
+import { type FlushedData, type FlushedHpException } from '../FlushData/types'
 import { type RequestParams } from './types'
+import { ExceptionType } from '../ExceptionCapture/types.d'
 function reportMiddleware(): Middleware<Context> {
   return {
     name: 'report',
@@ -27,7 +28,7 @@ class Reporter {
     }
 
     const actions = {
-      handleReport: () => report.handleReport?.(currentFlushed, report),
+      handleReport: () => this.handleReport(currentFlushed, report),
       url: () => this.sendBeacon(currentFlushed, report),
       'headers,url': () => this.fetch(currentFlushed, report),
       default: (...args: any[]) => console.error('report url is not defined', ...args)
@@ -35,6 +36,13 @@ class Reporter {
     const keys = Object.keys(report).sort().join(',') || 'default'
     const action = actions[keys as keyof typeof actions]
     action(currentFlushed, report)
+  }
+
+  private handleReport(flushedData: FlushedData, report: RequestParams) {
+    if (this.checkIsReportRequest(flushedData, report)) {
+      return
+    }
+    report.handleReport?.(flushedData)
   }
 
   private sendBeacon(flushedData: FlushedData, report: RequestParams) {
@@ -50,12 +58,14 @@ class Reporter {
   }
 
   private async fetch(flushedData: FlushedData, report: RequestParams) {
-    const url = report.url ?? ''
+    if (this.checkIsReportRequest(flushedData, report)) {
+      return
+    }
+    const url = report.url
     const headers = report.headers ?? {}
     headers['Content-Type'] = 'application/json'
     headers['keep-alive'] = 'true'
     try {
-      headers['x-monitor-report'] = 'true'
       await fetch(url, {
         method: 'POST',
         body: JSON.stringify(flushedData),
@@ -64,6 +74,17 @@ class Reporter {
     } catch (error) {
       console.error('report error', error)
     }
+  }
+
+  private checkIsReportRequest(flushedData: FlushedData, report: RequestParams) {
+    if (flushedData.flushedException.type !== ExceptionType.HP) {
+      return true
+    }
+    const url = (flushedData.flushedException as FlushedHpException).url
+    if (url === report.url) {
+      return true
+    }
+    return false
   }
 }
 

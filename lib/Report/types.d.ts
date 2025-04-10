@@ -1,7 +1,7 @@
 import { type FlushedData } from '../FlushData/types'
 
 interface RequestParams {
-  url?: string
+  url: string
   headers?: Record<string, string>
   handleReport?: (data: FlushedData) => void
 }
