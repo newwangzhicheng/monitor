@@ -1,31 +1,37 @@
 import { type Context, type Middleware } from '@/Middleware/types'
-import { ExceptionType, ResourceErrorTarget, type Exception } from '../ExceptionCapture/types.d'
+import {
+  ExceptionType,
+  ResourceErrorTarget,
+  type Exception,
+  type RequestInfo
+} from '../ExceptionCapture/types.d'
 import {
   type FlushedJsExceptionStack,
   type FlushedJsException,
   type FlushedRsException,
-  type FlushedUjException
+  type FlushedUjException,
+  type FlushedHpException
 } from './types.d'
 
 function flushDataMiddleware(): Middleware<Context> {
   return {
     name: 'flushData',
     process: async (ctx, next) => {
-      new FlushData(ctx)
+      const flushData = new FlushData(ctx)
+      flushData.flushException()
       await next()
     }
   }
 }
 
 class FlushData {
-  private ctx: Context
+  private readonly ctx: Context
   constructor(ctx: Context) {
     this.ctx = ctx
-    this.flushException()
   }
 
   // 刷新异常数据
-  private flushException() {
+  public flushException() {
     if (!this.ctx.exceptions) {
       return []
     }
@@ -37,6 +43,8 @@ class FlushData {
           return this.flushRsException(exception)
         case ExceptionType.UJ:
           return this.flushUjException(exception)
+        case ExceptionType.HP:
+          return this.flushHpException(exception)
         default:
           return null
       }
@@ -46,14 +54,16 @@ class FlushData {
 
   // js错误
   private flushJsException(exception: Exception): FlushedJsException {
+    const error = exception.error as ErrorEvent
     return {
-      stacks: this.parseExceptionStack(exception.error.error.stack)
+      stacks: this.parseExceptionStack(error.error.stack)
     }
   }
 
   // 资源错误
   private flushRsException(exception: Exception): FlushedRsException {
-    const target = exception.error.target as ResourceErrorTarget
+    const error = exception.error as ErrorEvent
+    const target = error.target as ResourceErrorTarget
     return {
       src: target.src ?? '',
       tagName: target.tagName ?? '',
@@ -63,12 +73,61 @@ class FlushData {
 
   // 未捕获异常
   private flushUjException(exception: Exception): FlushedUjException {
-    const reason = exception.error.message
-    console.log(exception.error.reason.stack)
+    const error = exception.error as PromiseRejectionEvent
+    const reason = error.reason.message
     return {
       reason,
-      stacks: this.parseExceptionStack(exception.error.reason.stack)
+      stacks: this.parseExceptionStack(error.reason.stack)
     }
+  }
+
+  // http错误
+  private flushHpException(exception: Exception): FlushedHpException {
+    const { headers, ...rest } = exception.error as RequestInfo
+    const error = (exception.error as RequestInfo).error
+    const flushedHpException = {
+      ...rest,
+      headers: this.desensitizeHeaders(this.switchHeaders(headers)),
+      reason: error?.message ?? ''
+    }
+    delete flushedHpException.error
+    return flushedHpException
+  }
+
+  // HeadersInit转换为Record<string, string>
+  private switchHeaders(headers: HeadersInit | undefined) {
+    // [string, string][] | Record<string, string> | Headers
+    if (headers instanceof Headers) {
+      return Object.fromEntries(headers.entries())
+    } else if (Array.isArray(headers)) {
+      return Object.fromEntries(headers)
+    } else if (headers) {
+      return headers
+    }
+    return {}
+  }
+
+  // 脱敏headers
+  private desensitizeHeaders(headers: Record<string, string>): Record<string, string> {
+    const sensitiveHeaders = [
+      'authorization',
+      'cookie',
+      'set-cookie',
+      'x-token',
+      'x-csrf-token',
+      'x-xsrf-token',
+      'x-user-id',
+      'x-uid'
+    ]
+    const desensitizedHeaders: Record<string, string> = {}
+    for (const key of Object.keys(headers)) {
+      if (sensitiveHeaders.includes(key.toLowerCase())) {
+        desensitizedHeaders[key] = '****'
+      } else {
+        desensitizedHeaders[key] = headers[key]
+      }
+    }
+    return desensitizedHeaders
   }
 
   // 解析异常栈行，获取文件名，函数名，行，列信息

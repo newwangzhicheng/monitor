@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { exceptionCaptureMiddleware } from './index'
 import { type Context } from '@/Middleware/types'

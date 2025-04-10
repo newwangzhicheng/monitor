@@ -2,16 +2,18 @@ import {
   type Exception,
   ExceptionType,
   type ResourceErrorTarget,
-  type MetadataObject
+  type MetadataObject,
+  type RequestInfo,
+  HTTPExceptionType
 } from './types.d'
 import { type Context, type Middleware } from '../Middleware/types'
 import MiddlewareManager from '../Middleware'
 
 class ExceptionCapture {
-  private exceptions: Exception[] = []
-  private exceptionUids: Set<string> = new Set()
-  private ctx: Context
-  private middlewareManager: MiddlewareManager<Context>
+  private readonly exceptions: Exception[] = []
+  private readonly exceptionUids: Set<string> = new Set()
+  private readonly ctx: Context
+  private readonly middlewareManager: MiddlewareManager<Context>
   constructor(ctx: Context) {
     this.ctx = ctx
     ctx.exceptions = this.exceptions
@@ -94,7 +96,12 @@ class ExceptionCapture {
   }
 
   // 初始化HTTP错误
-  private initHttpError() {}
+  private initHttpError() {
+    // 劫持xhr
+    this.injectXHR()
+    // 劫持fetch
+    this.injectFetch()
+  }
 
   // 初始化CORS错误
   private initCorsError() {
@@ -118,6 +125,194 @@ class ExceptionCapture {
     window.addEventListener('error', handleError, true)
   }
 
+  /**
+   * 劫持xhr
+   * open方法获取url method
+   * setRequestHeader方法获取请求头
+   * send方法获取请求发起时间
+   * load事件获取4xx 5xx响应
+   * error事件获取错误信息
+   * timeout事件获取超时信息
+   */
+  private injectXHR() {
+    const requestMap = new WeakMap<XMLHttpRequest, RequestInfo>()
+
+    this.injectXHROpen(requestMap)
+    this.injectSetRequestHeader(requestMap)
+    this.injectXHRSend(requestMap)
+  }
+
+  // 劫持xhr的open方法
+  private injectXHROpen(requestMap: WeakMap<XMLHttpRequest, RequestInfo>) {
+    const originalXHROpen = XMLHttpRequest.prototype.open
+    XMLHttpRequest.prototype.open = function (
+      method: string,
+      url: string | URL,
+      async: boolean = true,
+      username?: string | null,
+      password?: string | null
+    ) {
+      const requestInfo: RequestInfo = {
+        url: url.toString(),
+        method,
+        headers: {},
+        startTimestamp: 0,
+        endTimestamp: 0,
+        duration: 0,
+        status: 0,
+        statusText: '',
+        httpExceptionType: HTTPExceptionType.UNKNOWN
+      }
+      requestMap.set(this, requestInfo)
+      originalXHROpen.apply(this, [method, url, async, username, password])
+    }
+  }
+
+  // 劫持xhr的setRequestHeader方法
+  private injectSetRequestHeader(requestMap: WeakMap<XMLHttpRequest, RequestInfo>) {
+    const originalSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader
+    XMLHttpRequest.prototype.setRequestHeader = function (name: string, value: string) {
+      const requestInfo = requestMap.get(this)
+      if (requestInfo) {
+        ;(requestInfo.headers as Record<string, string>)[name] = value
+      }
+      originalSetRequestHeader.apply(this, [name, value])
+    }
+  }
+  // 劫持xhr的send方法
+  private injectXHRSend(requestMap: WeakMap<XMLHttpRequest, RequestInfo>) {
+    const instance = this
+    const originalXHRSend = XMLHttpRequest.prototype.send
+    XMLHttpRequest.prototype.send = function (
+      body?: Document | XMLHttpRequestBodyInit | null
+    ): void {
+      const requestInfo = requestMap.get(this)
+      if (requestInfo) {
+        requestInfo.startTimestamp = Date.now()
+      }
+      this.addEventListener('load', (e) => instance.handleXHRStatusException(e, requestInfo))
+      this.addEventListener('error', (e) => instance.handleXHRNetworkException(e, requestInfo))
+      this.addEventListener('timeout', (e) => instance.handleXHRTimeoutException(e, requestInfo))
+      originalXHRSend.apply(this, [body])
+    }
+  }
+
+  // 处理XHR HTTP状态错误
+  private handleXHRStatusException(event: Event, requestInfo: RequestInfo | undefined) {
+    if (requestInfo) {
+      const target = event.target as XMLHttpRequest
+      requestInfo.endTimestamp = Date.now()
+      requestInfo.duration = requestInfo.endTimestamp - requestInfo.startTimestamp
+      requestInfo.statusText = target.statusText
+      requestInfo.status = target.status
+      requestInfo.httpExceptionType = HTTPExceptionType.STATUS
+      this.pushAndTriggerHttpException(
+        `${requestInfo.url}-${requestInfo.method}-${requestInfo.httpExceptionType}-${requestInfo.status}`,
+        requestInfo
+      )
+    }
+  }
+
+  // 处理XHR网络错误
+  private handleXHRNetworkException(_: Event, requestInfo: RequestInfo | undefined) {
+    if (requestInfo) {
+      requestInfo.endTimestamp = Date.now()
+      requestInfo.duration = requestInfo.endTimestamp - requestInfo.startTimestamp
+      requestInfo.httpExceptionType = HTTPExceptionType.NETWORK
+      this.pushAndTriggerHttpException(
+        `${requestInfo.url}-${requestInfo.method}-${requestInfo.httpExceptionType}`,
+        requestInfo
+      )
+    }
+  }
+
+  // 处理XHR超时错误
+  private handleXHRTimeoutException(_: Event, requestInfo: RequestInfo | undefined) {
+    if (requestInfo) {
+      requestInfo.endTimestamp = Date.now()
+      requestInfo.duration = requestInfo.endTimestamp - requestInfo.startTimestamp
+      requestInfo.httpExceptionType = HTTPExceptionType.TIMEOUT
+      this.pushAndTriggerHttpException(
+        `${requestInfo.url}-${requestInfo.method}-${requestInfo.httpExceptionType}`,
+        requestInfo
+      )
+    }
+  }
+
+  private pushAndTriggerHttpException(uid: string, requestInfo: RequestInfo) {
+    const metadata = {
+      uid: this.generateExceptionUid(uid)
+    }
+    if (!this.uniqueExceptionUids(metadata.uid)) {
+      return
+    }
+
+    this.pushAndTriggerException({ event: requestInfo, metadata, type: ExceptionType.HP })
+  }
+
+  // 劫持fetch
+  private injectFetch() {
+    const originalFetch = window.fetch
+    const instance = this
+    window.fetch = async function (input: globalThis.RequestInfo | URL, init?: RequestInit) {
+      let url = ''
+      if (input instanceof Request) {
+        url = input.url
+      } else {
+        url = input.toString()
+      }
+      const requestInfo: RequestInfo = {
+        url,
+        method: init?.method ?? 'GET',
+        headers: init?.headers ?? {},
+        startTimestamp: 0,
+        endTimestamp: 0,
+        duration: 0,
+        status: 0,
+        statusText: '',
+        httpExceptionType: HTTPExceptionType.UNKNOWN
+      }
+      try {
+        const response = await originalFetch.apply(this, [input, init])
+        // fetch status error
+        instance.handleFetchStatusException.bind(instance)(response, requestInfo)
+        return response
+      } catch (error) {
+        instance.handleFetchNetworkAndTimeoutException.bind(instance)(error as Error, requestInfo)
+        throw error
+      }
+    }
+  }
+
+  // 处理fetch HTTP状态错误
+  private handleFetchStatusException(response: Response, requestInfo: RequestInfo) {
+    if (response.status >= 400) {
+      requestInfo.status = response.status
+      requestInfo.statusText = response.statusText
+      requestInfo.httpExceptionType = HTTPExceptionType.STATUS
+      this.pushAndTriggerHttpException(
+        `${requestInfo.url}-${requestInfo.method}-${requestInfo.httpExceptionType}`,
+        requestInfo
+      )
+    }
+  }
+
+  // 处理fetch网络错误和超时错误
+  private handleFetchNetworkAndTimeoutException(error: Error, requestInfo: RequestInfo) {
+    if (error instanceof DOMException && error.name === 'TimeoutError') {
+      // fetch timeout
+      requestInfo.httpExceptionType = HTTPExceptionType.TIMEOUT
+    } else if (error.message === '"Failed to fetch"') {
+      // fetch network error
+      requestInfo.httpExceptionType = HTTPExceptionType.NETWORK
+    }
+    requestInfo.error = error
+    this.pushAndTriggerHttpException(
+      `${requestInfo.url}-${requestInfo.method}-${requestInfo.httpExceptionType}-${error}`,
+      requestInfo
+    )
+  }
+
   // error事件会捕获到js错误，跨域js错误和静态资源加载错误
   private getExceptionType(event: ErrorEvent | Event): ExceptionType {
     const isJsException = event instanceof ErrorEvent
@@ -133,7 +328,7 @@ class ExceptionCapture {
     metadata,
     type
   }: {
-    event: ErrorEvent | Event
+    event: Event | RequestInfo
     metadata: MetadataObject
     type: ExceptionType
   }): Exception {
@@ -167,7 +362,7 @@ class ExceptionCapture {
     metadata,
     type
   }: {
-    event: ErrorEvent | Event
+    event: Event | RequestInfo
     metadata: MetadataObject
     type: ExceptionType
   }) {

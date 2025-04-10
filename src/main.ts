@@ -4,12 +4,17 @@ import { setupCounter } from '../lib/main'
 
 import initCapture from '../lib'
 
+// console.log('performance', window.performance)
+// const observer = new PerformanceObserver((list) => {
+//   console.log('list', list.getEntries())
+// })
+// observer.observe({ entryTypes: ['paint'] })
 initCapture({})
 // JS
-function test() {
-  new Array(-1)
-}
-setInterval(() => new Array(-2), 2000)
+// function test() {
+//   new Array(-1)
+// }
+// setInterval(() => test(), 2000)
 // RS
 // const script = document.createElement('script')
 // script.src = 'https://libs.baidu.com/jquery/3.6.0/jquery.min.js'
@@ -21,10 +26,34 @@ setInterval(() => new Array(-2), 2000)
 
 // UJ
 // Promise
-function testUj() {
-  Promise.reject(new Error('未捕获的Promise错误'))
+// function testUj() {
+//   Promise.reject(new Error('未捕获的Promise错误'))
+// }
+// testUj()
+
+// function testXhrError() {
+//   const xhr = new XMLHttpRequest()
+//   xhr.open('GET', 'https://www.baidu1.com')
+//   xhr.send()
+// }
+// testXhrError()
+
+function testFetchError() {
+  const headers = new Headers()
+  headers.set('Content-Type', 'application/json')
+  fetch('https://67f7443042d6c71cca64842a.mockapi.io/api/v1/delay11', {
+    headers,
+    method: 'GET',
+    signal: AbortSignal.timeout(1)
+  })
+    .then((res) => {
+      console.log('res', res)
+    })
+    .catch((err) => {
+      console.log('err', err)
+    })
 }
-testUj()
+testFetchError()
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div>

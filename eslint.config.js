@@ -11,7 +11,11 @@ export default [
   {
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unused-vars': 'off'
+      '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/no-this-alias': 'off',
+      'max-lines': ['error', 600],
+      'max-lines-per-function': ['error', 60],
+      complexity: ['error', { max: 10 }]
     }
   }
 ]

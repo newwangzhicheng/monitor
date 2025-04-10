@@ -8,7 +8,7 @@ enum ExceptionType {
 }
 
 interface Exception {
-  readonly error: any // 原始的错误
+  readonly error: Event | RequestInfo // 原始的错误
   readonly timestamp: number // 错误发生时间, 时间戳
   type: ExceptionType // 错误类型
   metadata: MetadataObject // 附加元数据，如环境等
@@ -21,20 +21,25 @@ interface MetadataObject {
   [key: string]: any
 }
 
-// // 异常错误结构体
-// export interface ExceptionData {
-//   exception: ExceptionType // 错误
-//   value?: string // 错误值
-//   /**
-//    * 如果不知道设置为'Unknown'
-//    * js event.error?.name, SyntaxError,ReferenceError,RangeError,TypeError,URIError
-//    * rs ResourceError
-//    * uj event.reason?.name, PromiseRejectionEvent
-//    */
-//   type: string // 错误类型
-//   stackTrace?: object // 错误堆栈
-//   errorUid: string // 错误id
-// }
+enum HTTPExceptionType {
+  NETWORK = 'network',
+  TIMEOUT = 'timeout',
+  STATUS = 'status',
+  UNKNOWN = 'unknown'
+}
+
+interface RequestInfo {
+  url: string
+  method: string
+  headers: Record<string, string> | HeadersInit
+  startTimestamp: number
+  endTimestamp: number
+  duration: number
+  status: number
+  statusText: string
+  httpExceptionType: HTTPExceptionType
+  error?: Error
+}
 
 // 资源错误Target
 interface ResourceErrorTarget extends EventTarget {
@@ -43,4 +48,11 @@ interface ResourceErrorTarget extends EventTarget {
   outerHTML?: string
 }
 
-export { ExceptionType, type Exception, type ResourceErrorTarget, type MetadataObject }
+export {
+  ExceptionType,
+  type Exception,
+  type ResourceErrorTarget,
+  type MetadataObject,
+  type RequestInfo,
+  HTTPExceptionType
+}

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function */
 import MiddlewareManager from './index'
 import { type Middleware } from './types'
 import { describe, test, expect, beforeEach, vi } from 'vitest'
