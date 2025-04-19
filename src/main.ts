@@ -15,7 +15,9 @@ initCapture({
     headers: {
       cookie: 'test=123'
     }
-  }
+  },
+  exception: true,
+  performanceMetrics: true
 })
 // JS
 // function test() {

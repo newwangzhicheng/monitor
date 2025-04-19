@@ -16,12 +16,23 @@ import {
   FlushedException
 } from './types.d'
 
-function flushDataMiddleware(): Middleware<Context> {
+function flushDataMiddleware({
+  type
+}: {
+  type: 'exception' | 'performanceMetrics'
+}): Middleware<Context> {
   return {
     name: 'flushData',
     process: async (ctx, next) => {
       const flushData = new FlushData(ctx)
-      flushData.flushException()
+      switch (type) {
+        case 'exception':
+          flushData.flushException()
+          break
+        case 'performanceMetrics':
+          flushData.flushPerformanceMetrics()
+          break
+      }
       await next()
     }
   }
@@ -29,11 +40,9 @@ function flushDataMiddleware(): Middleware<Context> {
 
 class FlushData {
   private readonly ctx: Context
-  private flushedData: FlushedData[]
+  private flushedExceptions: FlushedData[] = []
   constructor(ctx: Context) {
     this.ctx = ctx
-    this.flushedData = []
-    this.ctx.flushedData = this.flushedData
   }
 
   // 刷新异常数据
@@ -41,6 +50,7 @@ class FlushData {
     if (!this.ctx.currentException) {
       return
     }
+    this.ctx.flushedExceptions = this.flushedExceptions
     const exception = this.ctx.currentException
     let flushedException: FlushedException | null = null
     switch (exception.type) {
@@ -59,18 +69,29 @@ class FlushData {
       default:
         break
     }
-    const pageInfo = this.getPageInfo()
-    this.ctx.currentFlushed = {
-      pageInfo: pageInfo,
-      flushedException: flushedException as FlushedException
+    this.ctx.currentFlushedException = {
+      pageInfo: this.getPageInfo(),
+      flushed: flushedException as FlushedException
     }
-    this.flushedData.push(this.ctx.currentFlushed)
+    this.flushedExceptions.push(this.ctx.currentFlushedException)
     this.limitDataSize(100)
   }
 
+  // 刷新性能指标
+  public flushPerformanceMetrics() {
+    if (!this.ctx.performanceMetrics) {
+      return
+    }
+    this.ctx.flushedPerformanceMetrics = {
+      pageInfo: this.getPageInfo(),
+      flushed: this.ctx.performanceMetrics
+    }
+  }
+
+  // 限制异常数据大小
   private limitDataSize(size: number) {
-    if (this.flushedData.length > size) {
-      this.flushedData = this.flushedData.slice(-size)
+    if (this.flushedExceptions.length > size) {
+      this.flushedExceptions = this.flushedExceptions.slice(-size)
     }
     if (this.ctx.exceptions) {
       this.ctx.exceptions = this.ctx.exceptions.slice(-size)

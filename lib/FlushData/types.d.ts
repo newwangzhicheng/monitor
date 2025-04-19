@@ -1,8 +1,9 @@
 import { type ExceptionType } from '@/ExceptionCapture/types'
+import { type PerformanceMetrics } from '@/PerformanceMetricsCapture/types'
 
 interface FlushedData {
   pageInfo: PageInfo
-  flushedException: FlushedException
+  flushed: FlushedException | PerformanceMetrics
 }
 
 interface PageInfo {

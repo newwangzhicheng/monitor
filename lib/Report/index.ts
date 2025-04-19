@@ -2,12 +2,24 @@ import { type Context, type Middleware } from '../Middleware/types'
 import { type FlushedData, type FlushedHpException } from '../FlushData/types'
 import { type RequestParams } from './types'
 import { ExceptionType } from '../ExceptionCapture/types.d'
-function reportMiddleware(): Middleware<Context> {
+
+function reportMiddleware({
+  type
+}: {
+  type: 'exception' | 'performanceMetrics'
+}): Middleware<Context> {
   return {
     name: 'report',
     process: async (ctx, next) => {
       const reporter = new Reporter(ctx)
-      reporter.report()
+      switch (type) {
+        case 'exception':
+          reporter.reportException()
+          break
+        case 'performanceMetrics':
+          reporter.reportPerformanceMetrics()
+          break
+      }
       await next()
     }
   }
@@ -19,8 +31,18 @@ class Reporter {
     this.ctx = ctx
   }
 
-  public report() {
-    const currentFlushed = this.ctx.currentFlushed
+  // 上报性能指标
+  public reportPerformanceMetrics() {
+    this.report(this.ctx.flushedPerformanceMetrics)
+  }
+
+  // 上报异常
+  public reportException() {
+    this.report(this.ctx.currentFlushedException)
+  }
+
+  // 上报
+  private report(currentFlushed?: FlushedData) {
     const report = this.ctx.report
     if (!currentFlushed || !report) {
       console.error('flushedData or report is not defined')
@@ -38,6 +60,7 @@ class Reporter {
     action(currentFlushed, report)
   }
 
+  // 处理上报请求
   private handleReport(flushedData: FlushedData, report: RequestParams) {
     if (this.checkIsReportRequest(flushedData, report)) {
       return
@@ -45,6 +68,7 @@ class Reporter {
     report.handleReport?.(flushedData)
   }
 
+  // 发送Beacon请求
   private sendBeacon(flushedData: FlushedData, report: RequestParams) {
     if (!navigator.sendBeacon) {
       this.fetch(flushedData, report)
@@ -57,6 +81,7 @@ class Reporter {
     }
   }
 
+  // 发送fetch请求
   private async fetch(flushedData: FlushedData, report: RequestParams) {
     if (this.checkIsReportRequest(flushedData, report)) {
       return
@@ -76,13 +101,13 @@ class Reporter {
     }
   }
 
+  // 判断是否是report类型的请求
   private checkIsReportRequest(flushedData: FlushedData, report: RequestParams) {
-    if (flushedData.flushedException.type !== ExceptionType.HP) {
-      return true
-    }
-    const url = (flushedData.flushedException as FlushedHpException).url
-    if (url === report.url) {
-      return true
+    if (flushedData.flushed.type === ExceptionType.HP) {
+      const url = (flushedData.flushed as FlushedHpException).url
+      if (url === report.url) {
+        return true
+      }
     }
     return false
   }
